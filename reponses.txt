@@ -1,0 +1,62 @@
+1 : Nous allons parler du bug heartBleed, découvert en 2014.
+Lien de l'article : https://www.lemonde.fr/pixels/article/2014/12/30/faille-de-securite-heartbleed-le-pire-scenario-a-ete-evite_4547487_4408996.html
+Liens infos complémentaires : 
+https://fr.wikipedia.org/wiki/Heartbleed 
+https://www.synopsys.com/content/dam/synopsys/sig-assets/datasheets/Heartbleed-Story.pdf
+Heartbleed est une vulnérabilité logicielle introduite par un développeur bénévole dans la librairie openSSL.
+OpenSSL propose une implémentation open source du protocle SSL (secure socket layer).
+OpenSSL est très largement utilisé (66% des serveurs web), donc ce bug a une portée globale.
+Cette vulnérabilité a été découverte pas des chercheurs de Codenomicon et Google.
+Elle a été découverte pendant que ces dernier amélioraient une fonctionnalité dans leurs outils de test.
+Il se sont aperçu qu'il était possible d'attaquer les serveurs de la compagnie (Codenomicon) depuis l'exterieur des locaux, sans laisser la moindre trace.
+Via cette faille, il était possible de voler des clés privées utilisées pour des communications sécurisées.
+Voici le scénario : Les serveurs communiquaient via deux canaux avec les clients(navigateurs).
+Le premier canal était celui d'échange, correctement chiffré par clés asymétriques, donc le flux est illisible sans possession des clés privées.
+Un deuxième canal dit "heartbeet", dont le rôle était de permettre au serveur de ping le client pour savoir si il était toujours présent (par exemple fermeture du navigateur).
+Le canal heartBeet n'était pas chiffré et donc vulnérable aux attaques.
+Les pirates utilisent ce canal afin se faire passer pour le serveur pour d'obtenir des informations du client, lequel les fournissait sans broncher, car de son point de vue c'etait une requête tout
+à fait légitime provenant du serveur avec qui il était déja en communication.
+Tester le bon scénario implique de connaître l'existence de ces deux canaux et un connaissance de la librairie SSL.
+Cela aurait tout a fait pu être évité en chiffrant le canal heartBeet.
+Cette faille à très certainement eu de lourde conséquence (vol de données) car elle a été présente deux ans avant d'être corrigée.
+
+
+2 : Ticket choisi : https://issues.apache.org/jira/projects/COLLECTIONS/issues/COLLECTIONS-802?filter=doneissues
+Le bug portait sur la manière dont un les appels sur un itérateur devait affecter la collection à laquelle il est associé (ici une map)
+Le scénario souhaité était que si on est sur le dernier élément suite à des appel à mapMap.next(), puis que l'on appel remove(), on s'attends a ce que le dernier élément soit bien supprimé.
+Le bug se déclenchait si on appelait hasNext entre les appel next et remove, après être tombé sur le dernier élement.
+L'auteur tu ticket teste cela avec une map à une seule entrée, afin de tester si la map est vide après suppression du dernier élément (l'unique entrée de la map).
+Ils s'avérait qu'un appel à hasNext quand on est sur le dernier élement suivi d'un appel à remove était faussé (dernier élément non supprimé).
+On peut considérer la portée du bug comme globale, les itérateurs sont des objets très largement utilisés par les developpeurs.
+Il est tout à fait probable que les itérateur soient des sources de dépendances dans le projet apache.
+Cause du problème : quand on est sur le dernier élement, l'appel à hasNext renvoit faux, ce qui entraine une mise à null de la currentKey de l'itérateur (currentKey référence lélément courant).
+Ainsi l'appel remove revenait à essayer de supprimer l'élément null, ce qui ne correspond pas à la suppression de l'élément courant.
+Le bug a été corrigé en supprimant cette mise à null quand hasNext renvoit false.
+Il existait déja un test permettant de detecter ceci, c'est d'ailleurs ainsi qu'il a été découvert par un utilisateur éxecutant cette suite de test.
+Mais ce test ne provenait pas de la campagne de test de chez apache.(bug découvert via la Guava's testlib)
+Le test correspondant à été intégré chez apache. (ajout de la Guava's testlib au projet apache).
+
+3:
+concrete experiments performed :
+Au debut avec leur logiciel chaos monkey, lequel choisissait aléatoirement une vm hebargeant un service puis l'éteint.
+Soumission de code en production, puis multiples modification des paramètre d'execution afin de voir l'impact de cette modification pas seulement sur une seule configuration dexecution du systeme.
+Shutdown de certaines de leurs vm hebergéant des services (Controle Pane).
+Simulation de pics de demandes entrantes.
+Simlation d'entrées invalides.(malformed data inputs)
+
+
+
+requirement for these experiments :
+Pour le cas particulier du systeme nextflix, ils disposent d'un système distribué sous forme de machines virtuelles hébergeant chacune un ou plusieurs services relatifs au systeme globale (netflix)
+La distribution via des machines virtuelles est un exemple de distribution, donc pas obligatoire, on peut distribuer sur des machines hôtes sans passer par des vm.
+Conernant le principe dune "experience" dans le chaos engineering, il faut spécifier des hypotheses, les variables dependantes et indépendantes, le contexte de l'experience.
+-------------------Dans ce contexte, ce sont des vm hebergeant des service relatif à lUI de netflix.
+
+observed variables :
+
+main result :
+
+Is netflix only company doing this ? :
+Non, il y a également amazon, google, microsoft et facebook (les seules citées, il y en a probablement bien d'autres)
+
+speculate :
